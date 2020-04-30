@@ -12,6 +12,10 @@ const saltRounds = 10;
 const session = require("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
+// Google Login
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+// Find OrCreate create a function to find or create a user in database from external auths
+const findOrCreate = require("mongoose-findorcreate");
 
 const app = express();
 
@@ -44,6 +48,7 @@ const userSchema = new mongoose.Schema({
 });
 
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 const User = new mongoose.model("User", userSchema);
 
@@ -52,6 +57,18 @@ passport.use(User.createStrategy());
 // Serialize and Deserialize Sessions
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
+
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "http://localhost:3000/auth/google/secrets",
+  userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+},
+function(acceswsToken, refreshToken, profile, cb) {
+  User.findOrCreate({ googleId: profile.id }, function(err, user) {
+    return cb(err, user);
+  });
+}));
 
 app.get("/", function(req, res) {
   res.render("home");
